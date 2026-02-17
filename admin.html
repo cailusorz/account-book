@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>云端记账本 - 管理员面板</title>
+    
+    <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- PWA和图标配置 -->
+    <link rel="icon" type="image/png" href="./icons/favicon-96x96.png" sizes="96x96">
+    <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg">
+    <link rel="shortcut icon" href="./icons/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
+    <meta name="theme-color" content="#4ECDC4">
+    <link rel="manifest" href="./manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="云端记账本">
+    <meta name="msapplication-TileColor" content="#4ECDC4">
+</head>
+<body>
+    <!-- 侧边栏（PC端使用） -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h2>管理员面板</h2>
+                <p>用户管理 · 系统设置</p>
+            </div>
+        </div>
+        
+        <div class="user-info">
+            <div class="username" id="sidebarAdmin">管理员</div>
+            <div class="repo" id="sidebarRepo">仓库: 加载中...</div>
+            <div class="last-sync" id="lastSyncTime">最后同步: 从未同步</div>
+        </div>
+        
+        <div class="sidebar-nav">
+            <button class="nav-item active" data-target="user-management">
+                <i class="fas fa-users"></i>
+                <span>用户管理</span>
+            </button>
+            <button class="nav-item" data-target="admin-dashboard">
+                <i class="fas fa-chart-line"></i>
+                <span>管理仪表盘</span>
+            </button>
+            <button class="nav-item" data-target="system-settings">
+                <i class="fas fa-cog"></i>
+                <span>系统设置</span>
+            </button>
+        </div>
+        
+        <div class="sidebar-footer">
+            <button class="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>退出登录</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- 主内容区 -->
+    <div class="main-content">
+        <!-- 顶部导航 -->
+        <div class="top-nav">
+            <div class="page-title" id="pageTitle">
+                <i class="fas fa-users"></i>
+                <span>用户管理</span>
+            </div>
+            
+            <div class="top-nav-actions">
+                <div class="sync-status" id="syncStatus">
+                    <i class="fas fa-check-circle"></i>
+                    <span>已同步</span>
+                </div>
+                
+                <!-- 日期筛选组件（只在管理仪表盘显示） -->
+                <div class="date-filter" id="adminDateFilter" style="display: none;">
+                    <div class="selected-display" id="adminDateFilterDisplay">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span id="adminDateRangeText">本月</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="date-dropdown" id="adminDateDropdown">
+                        <ul class="date-presets">
+                            <li data-value="today">今天</li>
+                            <li data-value="week">本周</li>
+                            <li data-value="month" class="active">本月</li>
+                            <li data-value="year">本年</li>
+                            <li data-value="all">全部</li>
+                            <li data-value="custom">自定义</li>
+                        </ul>
+                        <div class="custom-range-picker" id="adminCustomRangePicker" style="display: none;">
+                            <div class="date-inputs">
+                                <input type="date" id="adminStartDate">
+                                <span>至</span>
+                                <input type="date" id="adminEndDate">
+                            </div>
+                            <button class="apply-btn" id="adminApplyCustomRange">应用</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="connection-status" id="connectionStatus">
+                    <div class="connection-indicator online"></div>
+                    <span>在线</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 用户管理页面 -->
+        <div id="user-management" class="page-section active">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-users"></i>所有用户列表</div>
+                    <button class="btn-primary" onclick="showAddUserModal()"><i class="fas fa-user-plus"></i>添加用户</button>
+                </div>
+                <div class="user-list" id="userList">
+                    <!-- 动态加载用户列表 -->
+                    <div class="loading" style="display: none;">
+                        <div class="loading-spinner"></div>
+                        <div class="loading-text">加载中...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 管理仪表盘页面 -->
+        <div id="admin-dashboard" class="page-section">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-chart-line"></i>用户数据仪表盘</div>
+                    <div class="user-selector" id="selectedUserDisplay" style="display: none;">
+                        <span>当前查看用户：</span>
+                        <strong id="currentViewingUser">未选择</strong>
+                    </div>
+                </div>
+                
+                <!-- 统计数据卡片 -->
+                <div class="stats-cards" id="adminStats">
+                    <div class="stat-card income">
+                        <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+                        <div class="stat-value" id="adminTotalIncome">¥0</div>
+                        <div class="stat-label">总收入</div>
+                    </div>
+                    <div class="stat-card expense">
+                        <div class="stat-icon"><i class="fas fa-shopping-cart"></i></div>
+                        <div class="stat-value" id="adminTotalExpense">¥0</div>
+                        <div class="stat-label">总支出</div>
+                    </div>
+                    <div class="stat-card loan">
+                        <div class="stat-icon"><i class="fas fa-hand-holding-usd"></i></div>
+                        <div class="stat-value" id="adminTotalLoan">¥0</div>
+                        <div class="stat-label">净借款</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-piggy-bank"></i></div>
+                        <div class="stat-value" id="adminBalance">¥0</div>
+                        <div class="stat-label">当前余额</div>
+                    </div>
+                </div>
+                
+                <!-- 图表区域 -->
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <div class="chart-title"><i class="fas fa-chart-pie"></i>支出分类分布</div>
+                        <div class="chart-wrapper"><canvas id="adminExpenseChart"></canvas></div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title"><i class="fas fa-chart-bar"></i>月度趋势</div>
+                        <div class="chart-wrapper"><canvas id="adminMonthlyChart"></canvas></div>
+                    </div>
+                </div>
+                
+                <!-- 所有记录列表 -->
+                <div class="card" style="margin-top: 24px;">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-list"></i>用户记账记录</div>
+                        <button class="btn-secondary" onclick="exportUserRecords()"><i class="fas fa-download"></i>导出CSV</button>
+                    </div>
+                    <div class="records-list" id="adminRecordsList">
+                        <div class="empty-state">
+                            <div class="empty-state-icon"><i class="fas fa-receipt"></i></div>
+                            <div class="empty-state-title">请先选择一个用户</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 系统设置页面 -->
+        <div id="system-settings" class="page-section">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-cog"></i>账户设置</div>
+                </div>
+                <div style="padding: 20px;">
+                    <!-- 用户名（只读） -->
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-user"></i>用户名</label>
+                        <input type="text" class="form-input" id="adminUsername" readonly>
+                    </div>
+                    
+                    <!-- GitHub仓库 -->
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-database"></i>GitHub仓库</label>
+                        <input type="text" class="form-input" id="adminRepo" placeholder="用户名/仓库名">
+                    </div>
+                    
+                    <!-- GitHub Token -->
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-key"></i>GitHub Token</label>
+                        <input type="password" class="form-input" id="adminToken" placeholder="输入新Token以更新">
+                        <small style="display: block; margin-top: 8px; color: var(--text-secondary);">需要 repo 权限，用于同步数据。留空则保留原Token。</small>
+                    </div>
+                    
+                    <!-- 修改管理员密码 -->
+                    <div class="form-group" style="margin-top: 24px; border-top: 1px solid var(--card-border); padding-top: 24px;">
+                        <label class="form-label"><i class="fas fa-lock"></i>修改管理员密码</label>
+                        <input type="password" class="form-input" id="adminCurrentPwd" placeholder="当前密码" style="margin-bottom: 10px;">
+                        <input type="password" class="form-input" id="adminNewPwd" placeholder="新密码" style="margin-bottom: 10px;">
+                        <input type="password" class="form-input" id="adminConfirmPwd" placeholder="确认新密码">
+                        <button class="btn-secondary" style="margin-top: 16px;" onclick="changeAdminPassword()"><i class="fas fa-key"></i>修改密码</button>
+                    </div>
+                    
+                    <!-- 同步设置 -->
+                    <div class="form-group" style="margin-top: 24px;">
+                        <label class="form-label"><i class="fas fa-sync-alt"></i>同步设置</label>
+                        <div class="alert-options">
+                            <label class="checkbox-label"><input type="checkbox" id="adminAutoSync" checked><span>自动同步（每5分钟）</span></label>
+                            <label class="checkbox-label"><input type="checkbox" id="adminSyncOnChange" checked><span>数据变更时自动同步</span></label>
+                            <label class="checkbox-label"><input type="checkbox" id="adminSyncOnStart" checked><span>启动时自动同步</span></label>
+                        </div>
+                    </div>
+                    
+                    <!-- 主题设置 -->
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-palette"></i>主题设置</label>
+                        <select class="form-select" id="adminThemeSelect" onchange="changeAdminTheme(this.value)">
+                            <option value="auto">自动</option>
+                            <option value="light">浅色模式</option>
+                            <option value="dark">深色模式</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 保存设置按钮 -->
+                    <button class="btn-primary" onclick="saveAdminSettings()" style="margin-top: 24px;"><i class="fas fa-save"></i>保存设置</button>
+                    
+                    <!-- 测试Token按钮 -->
+                    <button class="btn-secondary" onclick="testAdminToken()" style="margin-top: 12px;"><i class="fas fa-vial"></i>测试Token</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-info-circle"></i>关于</div>
+                </div>
+                <div style="padding: 20px; text-align: center;">
+                    <p>云端记账本 管理员版 v2.0.0</p>
+                    <p style="color: var(--text-secondary);">基于GitHub API构建</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 移动端底部导航（管理员用） -->
+    <div class="bottom-nav">
+        <div class="bottom-nav-item active" data-target="user-management">
+            <i class="fas fa-users"></i>
+            <span>用户管理</span>
+        </div>
+        <div class="bottom-nav-item" data-target="admin-dashboard">
+            <i class="fas fa-chart-line"></i>
+            <span>仪表盘</span>
+        </div>
+        <div class="bottom-nav-item" data-target="system-settings">
+            <i class="fas fa-cog"></i>
+            <span>设置</span>
+        </div>
+        <div class="bottom-nav-item" onclick="logout()">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>退出</span>
+        </div>
+    </div>
+    
+    <!-- 主题切换按钮 -->
+    <div class="theme-toggle">
+        <button class="theme-btn" onclick="toggleTheme()"><i class="fas fa-moon"></i></button>
+    </div>
+    
+    <!-- 加载动画 -->
+    <div class="loading" id="loading" style="display: none;">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">加载中...</div>
+    </div>
+    
+    <!-- 模态框 -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">标题</h3>
+            </div>
+            <div class="modal-body" id="modalBody">内容</div>
+            <div class="modal-footer" id="modalFooter">
+                <button class="btn-secondary" onclick="closeModal()">取消</button>
+                <button class="btn-primary" onclick="confirmModal()">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./admin.js"></script>
+    <!-- 添加Service Worker注册，确保管理员页面也能离线访问 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(reg => console.log('Admin ServiceWorker注册成功:', reg.scope))
+                .catch(err => console.error('Admin ServiceWorker注册失败:', err));
+        }
+    </script>
+</body>
+</html>

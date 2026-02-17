@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>云端记账本 - 记账管理</title>
+    
+    <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- PWA和图标配置 -->
+    <link rel="icon" type="image/png" href="./icons/favicon-96x96.png" sizes="96x96">
+    <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg">
+    <link rel="shortcut icon" href="./icons/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
+    <meta name="theme-color" content="#4ECDC4">
+    <link rel="manifest" href="./manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="云端记账本">
+    <meta name="msapplication-TileColor" content="#4ECDC4">
+    <style>
+        /* 下拉刷新样式已移除 */
+    </style>
+</head>
+<body>
+    <!-- 下拉刷新指示器已移除 -->
+
+    <!-- 侧边栏（PC端使用） -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+                <h2>云端记账本</h2>
+                <p>极简记账 · 实时同步</p>
+            </div>
+        </div>
+        
+        <div class="user-info">
+            <div class="username" id="sidebarUsername">加载中...</div>
+            <div class="repo" id="sidebarRepo">仓库: 加载中...</div>
+            <div class="last-sync" id="lastSyncTime">最后同步: 从未同步</div>
+        </div>
+        
+        <div class="sidebar-nav">
+            <button class="nav-item active" data-target="dashboard">
+                <i class="fas fa-home"></i>
+                <span>仪表盘</span>
+            </button>
+            <button class="nav-item" data-target="add-record">
+                <i class="fas fa-plus-circle"></i>
+                <span>记账</span>
+            </button>
+            <button class="nav-item" data-target="records">
+                <i class="fas fa-list"></i>
+                <span>所有记录</span>
+            </button>
+            <button class="nav-item" data-target="analytics">
+                <i class="fas fa-chart-line"></i>
+                <span>数据分析</span>
+            </button>
+            <button class="nav-item" data-target="budgets">
+                <i class="fas fa-wallet"></i>
+                <span>预算管理</span>
+            </button>
+            <button class="nav-item" data-target="categories">
+                <i class="fas fa-tags"></i>
+                <span>分类管理</span>
+            </button>
+            <button class="nav-item" data-target="export">
+                <i class="fas fa-download"></i>
+                <span>导出数据</span>
+            </button>
+            <button class="nav-item" data-target="settings">
+                <i class="fas fa-cog"></i>
+                <span>设置</span>
+            </button>
+        </div>
+        
+        <div class="budget-warning" id="budgetWarning" style="display: none;">
+            <h4><i class="fas fa-exclamation-triangle"></i> 预算预警</h4>
+            <p>部分分类已接近预算上限</p>
+            <div class="budget-progress">
+                <div class="budget-progress-bar" id="warningProgress"></div>
+            </div>
+            <small>点击查看详情</small>
+        </div>
+        
+        <div class="sidebar-footer">
+            <button class="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>退出登录</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- 主内容区 -->
+    <div class="main-content">
+        <!-- 顶部导航 -->
+        <div class="top-nav">
+            <div class="page-title" id="pageTitle">
+                <i class="fas fa-home"></i>
+                <span>仪表盘</span>
+            </div>
+            
+            <div class="top-nav-actions">
+                <div class="sync-status" id="syncStatus">
+                    <i class="fas fa-check-circle"></i>
+                    <span>已同步</span>
+                </div>
+                
+                <!-- 自定义日期筛选组件 -->
+                <div class="date-filter" id="dateFilter">
+                    <div class="selected-display" id="dateFilterDisplay">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span id="dateRangeText">本月</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="date-dropdown" id="dateDropdown">
+                        <ul class="date-presets">
+                            <li data-value="today">今天</li>
+                            <li data-value="week">本周</li>
+                            <li data-value="month" class="active">本月</li>
+                            <li data-value="year">本年</li>
+                            <li data-value="all">全部</li>
+                            <li data-value="custom">自定义</li>
+                        </ul>
+                        <div class="custom-range-picker" id="customRangePicker" style="display: none;">
+                            <div class="date-inputs">
+                                <input type="date" id="startDate">
+                                <span>至</span>
+                                <input type="date" id="endDate">
+                            </div>
+                            <button class="apply-btn" id="applyCustomRange">应用</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="connection-status" id="connectionStatus">
+                    <div class="connection-indicator online"></div>
+                    <span>在线</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 仪表盘 -->
+        <div id="dashboard" class="page-section active">
+            <div class="stats-cards">
+                <div class="stat-card income">
+                    <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+                    <div class="stat-value" id="totalIncome">¥0</div>
+                    <div class="stat-label">总收入</div>
+                    <div class="stat-change positive" id="incomeChange"><i class="fas fa-arrow-up"></i><span>0%</span></div>
+                </div>
+                <div class="stat-card expense">
+                    <div class="stat-icon"><i class="fas fa-shopping-cart"></i></div>
+                    <div class="stat-value" id="totalExpense">¥0</div>
+                    <div class="stat-label">总支出</div>
+                    <div class="stat-change negative" id="expenseChange"><i class="fas fa-arrow-up"></i><span>0%</span></div>
+                </div>
+                <div class="stat-card loan">
+                    <div class="stat-icon"><i class="fas fa-hand-holding-usd"></i></div>
+                    <div class="stat-value" id="totalLoan">¥0</div>
+                    <div class="stat-label">净借款</div>
+                    <div class="stat-change positive" id="loanChange"><i class="fas fa-minus"></i><span>0</span></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-piggy-bank"></i></div>
+                    <div class="stat-value" id="balance">¥0</div>
+                    <div class="stat-label">当前余额</div>
+                    <div class="stat-change" id="balanceChange"><i class="fas fa-equals"></i><span>结余</span></div>
+                </div>
+            </div>
+            
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <div class="chart-title"><i class="fas fa-chart-pie"></i>支出分类分布</div>
+                    <div class="chart-wrapper"><canvas id="expenseChart"></canvas></div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title"><i class="fas fa-chart-bar"></i>月度趋势</div>
+                    <div class="chart-wrapper"><canvas id="monthlyChart"></canvas></div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-clock"></i>最近记录</div>
+                    <button class="view-all-btn" onclick="switchSection('records')"><i class="fas fa-list"></i>查看全部</button>
+                </div>
+                <div class="records-list" id="recentRecords">
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><i class="fas fa-receipt"></i></div>
+                        <div class="empty-state-title">暂无记录</div>
+                        <div class="empty-state-text">开始记录您的第一笔账单吧</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 记账页面 -->
+        <div id="add-record" class="page-section">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-plus-circle"></i>添加新记录</div>
+                </div>
+                <div id="formMessage"></div>
+                <form class="record-form" onsubmit="event.preventDefault(); addRecord();">
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-exchange-alt"></i>类型</label>
+                        <select class="form-select" id="recordType" required onchange="updateCategories()">
+                            <option value="">选择类型</option>
+                            <option value="收入">收入</option>
+                            <option value="支出">支出</option>
+                            <option value="借贷">借贷</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-tag"></i>分类</label>
+                        <select class="form-select" id="recordCategory" required>
+                            <option value="">先选择类型</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-align-left"></i>描述</label>
+                        <input type="text" class="form-input" id="recordDescription" placeholder="请输入描述（可选）">
+                    </div>
+                    <div class="form-group amount-input-group">
+                        <label class="form-label"><i class="fas fa-yen-sign"></i>金额</label>
+                        <!-- 修改点：将 type="number" 改为 type="text" 并调整 placeholder -->
+                        <input type="text" class="form-input" id="recordAmount" placeholder="输入金额或计算公式，如 (10.8+4.2)*2" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-calendar"></i>日期</label>
+                        <input type="date" class="form-input" id="recordDate">
+                    </div>
+                    <button type="submit" class="submit-btn"><i class="fas fa-check"></i>添加记录</button>
+                </form>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-lightbulb"></i>智能提示</div>
+                </div>
+                <div id="recordTips">
+                    <div class="message info">
+                        <i class="fas fa-info-circle"></i>
+                        <div>
+                            <strong>记账小贴士：</strong>
+                            <ul style="margin-top: 8px; padding-left: 20px;">
+                                <li>借贷类型中，"还款"会自动记录为负数</li>
+                                <li>日期留空将自动使用今天日期</li>
+                                <li>数据会自动同步到云端，无需手动保存</li>
+                                <li>金额支持输入计算公式，如 (10.8+4.2)*2</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 所有记录（已移除导出CSV和添加记录按钮） -->
+        <div id="records" class="page-section">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-list"></i>所有记录</div>
+                </div>
+                <div class="filters-bar" style="margin-bottom: 24px;">
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <select class="form-select" style="min-width: 120px;" id="filterType" onchange="filterRecords()">
+                            <option value="">所有类型</option>
+                            <option value="收入">收入</option>
+                            <option value="支出">支出</option>
+                            <option value="借贷">借贷</option>
+                        </select>
+                        <select class="form-select" style="min-width: 140px;" id="filterCategory" onchange="filterRecords()">
+                            <option value="">所有分类</option>
+                        </select>
+                        <input type="text" class="form-input" style="min-width: 200px;" id="filterKeyword" placeholder="搜索描述..." oninput="filterRecords()">
+                    </div>
+                </div>
+                <div class="records-list" id="allRecords"></div>
+                <div class="pagination" id="pagination" style="margin-top: 24px; display: flex; justify-content: center; gap: 8px;"></div>
+            </div>
+        </div>
+        
+        <!-- 数据分析 -->
+        <div id="analytics" class="page-section">
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <div class="chart-title"><i class="fas fa-chart-pie"></i>收支比例</div>
+                    <div class="chart-wrapper"><canvas id="incomeChart"></canvas></div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title"><i class="fas fa-chart-line"></i>收支趋势</div>
+                    <div class="chart-wrapper"><canvas id="trendChart"></canvas></div>
+                </div>
+            </div>
+            <div class="category-stats-grid">
+                <div class="category-type">
+                    <h4><i class="fas fa-money-bill-wave text-success"></i> 收入分类统计</h4>
+                    <div id="incomeCategories"></div>
+                </div>
+                <div class="category-type">
+                    <h4><i class="fas fa-shopping-cart text-danger"></i> 支出分类统计</h4>
+                    <div id="expenseCategories"></div>
+                </div>
+            </div>
+            <!-- 增加间距，使卡片与分类统计分开 -->
+            <div style="margin-top: 32px;"></div>
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-chart-bar"></i>月度统计报表</div>
+                    <select class="form-select" style="width: auto;" id="analyticsYear" onchange="updateAnalytics()"></select>
+                </div>
+                <div class="chart-wrapper" style="height: 400px;"><canvas id="yearlyChart"></canvas></div>
+            </div>
+        </div>
+        
+        <!-- 预算管理 -->
+        <div id="budgets" class="page-section">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-wallet"></i>预算管理</div>
+                    <button class="btn-primary" onclick="showAddBudgetModal()"><i class="fas fa-plus"></i>添加预算</button>
+                </div>
+                <div class="budget-grid" id="budgetList">
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><i class="fas fa-wallet"></i></div>
+                        <div class="empty-state-title">暂无预算</div>
+                        <div class="empty-state-text">添加预算来跟踪您的支出</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-bell"></i>预算预警设置</div>
+                </div>
+                <div style="padding: 20px;">
+                    <div class="form-group">
+                        <label class="form-label">预警阈值</label>
+                        <div class="slider-container">
+                            <input type="range" class="form-range" id="alertThreshold" min="50" max="100" value="80">
+                            <div class="slider-value"><span>预警阈值:</span><span id="thresholdValue">80%</span></div>
+                        </div>
+                    </div>
+                    <div class="alert-options">
+                        <label class="checkbox-label"><input type="checkbox" id="enableEmailAlert" checked><span>启用邮件提醒</span></label>
+                        <label class="checkbox-label"><input type="checkbox" id="enablePushAlert" checked><span>启用推送提醒</span></label>
+                    </div>
+                    <button class="btn-primary" style="margin-top: 20px;" onclick="saveAlertSettings()"><i class="fas fa-save"></i>保存设置</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 分类管理 -->
+        <div id="categories" class="page-section">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-tags"></i>分类管理</div>
+                    <button class="btn-primary" onclick="showAddCategoryModal()"><i class="fas fa-plus"></i>添加分类</button>
+                </div>
+                <div class="category-management">
+                    <div class="category-type" style="grid-column: 1 / -1;">
+                        <h4><i class="fas fa-exchange-alt"></i> 所有分类</h4>
+                        <div id="allCategoriesList"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-lightbulb"></i>分类使用统计</div>
+                </div>
+                <div class="category-stats-grid"><div id="categoryUsageStats"></div></div>
+            </div>
+        </div>
+        
+        <!-- 导出数据 -->
+        <div id="export" class="page-section">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-download"></i>数据导出</div>
+                </div>
+                <div class="export-options">
+                    <div class="export-option" onclick="exportToCSV()"><i class="fas fa-file-csv"></i><span>导出为CSV</span></div>
+                    <div class="export-option" onclick="exportToJSON()"><i class="fas fa-file-code"></i><span>导出为JSON</span></div>
+                    <div class="export-option" onclick="exportToExcel()"><i class="fas fa-file-excel"></i><span>导出为Excel</span></div>
+                    <div class="export-option" onclick="printRecords()"><i class="fas fa-print"></i><span>打印报表</span></div>
+                </div>
+                <div style="margin-top: 32px;">
+                    <h4 style="margin-bottom: 16px; color: var(--text-primary);">导出设置</h4>
+                    <div class="form-group">
+                        <label class="form-label">导出时间范围</label>
+                        <select class="form-select" id="exportDateRange">
+                            <option value="all">全部数据</option>
+                            <option value="month">最近一个月</option>
+                            <option value="quarter">最近一个季度</option>
+                            <option value="year">最近一年</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label class="form-label">导出内容</label>
+                        <div class="alert-options">
+                            <label class="checkbox-label"><input type="checkbox" id="exportRecords" checked><span>记账记录</span></label>
+                            <label class="checkbox-label"><input type="checkbox" id="exportCategories" checked><span>分类信息</span></label>
+                            <label class="checkbox-label"><input type="checkbox" id="exportBudgets" checked><span>预算设置</span></label>
+                            <label class="checkbox-label"><input type="checkbox" id="exportSettings" checked><span>用户设置</span></label>
+                        </div>
+                    </div>
+                    <button class="btn-primary" style="margin-top: 24px; width: 100%;" onclick="startExport()"><i class="fas fa-download"></i>开始导出</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-history"></i>备份历史</div>
+                </div>
+                <div id="backupHistory"></div>
+            </div>
+        </div>
+        
+        <!-- 设置 -->
+        <div id="settings" class="page-section">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-cog"></i>账户设置</div>
+                </div>
+                <div style="padding: 20px;">
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-user"></i>用户名</label>
+                        <input type="text" class="form-input" id="settingsUsername" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-database"></i>GitHub仓库</label>
+                        <input type="text" class="form-input" id="settingsRepo">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-key"></i>GitHub Token</label>
+                        <input type="password" class="form-input" id="settingsToken" placeholder="输入新Token以更新">
+                        <small style="display: block; margin-top: 8px; color: var(--text-secondary);">需要 repo 权限，用于同步数据。留空则保留原Token。</small>
+                    </div>
+                    
+                    <!-- 修改密码部分 -->
+                    <div class="form-group" style="margin-top: 24px; border-top: 1px solid var(--card-border); padding-top: 24px;">
+                        <label class="form-label"><i class="fas fa-lock"></i>修改密码</label>
+                        <input type="password" class="form-input" id="currentPassword" placeholder="当前密码" style="margin-bottom: 10px;">
+                        <input type="password" class="form-input" id="newPassword" placeholder="新密码" style="margin-bottom: 10px;">
+                        <input type="password" class="form-input" id="confirmNewPassword" placeholder="确认新密码">
+                        <button class="btn-secondary" style="margin-top: 16px;" onclick="changePassword()"><i class="fas fa-key"></i>修改密码</button>
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 24px;">
+                        <label class="form-label"><i class="fas fa-sync-alt"></i>同步设置</label>
+                        <div class="alert-options">
+                            <label class="checkbox-label"><input type="checkbox" id="autoSync" checked><span>自动同步（每5分钟）</span></label>
+                            <label class="checkbox-label"><input type="checkbox" id="syncOnChange" checked><span>数据变更时自动同步</span></label>
+                            <label class="checkbox-label"><input type="checkbox" id="syncOnStart" checked><span>启动时自动同步</span></label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-palette"></i>主题设置</label>
+                        <select class="form-select" id="themeSelect" onchange="changeTheme(this.value)">
+                            <option value="auto">自动</option>
+                            <option value="light">浅色模式</option>
+                            <option value="dark">深色模式</option>
+                        </select>
+                    </div>
+                    <button class="btn-primary" onclick="saveSettings()" style="margin-top: 24px;"><i class="fas fa-save"></i>保存设置</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-shield-alt"></i>数据安全</div>
+                </div>
+                <div style="padding: 20px;">
+                    <div class="danger-zone">
+                        <h4><i class="fas fa-exclamation-triangle"></i> 危险操作</h4>
+                        <p class="danger-warning">以下操作不可逆，请谨慎操作</p>
+                        <div class="danger-actions">
+                            <button class="danger-btn" onclick="clearLocalData()"><i class="fas fa-trash"></i>清除本地数据</button>
+                            <button class="danger-btn" onclick="deleteAccount()"><i class="fas fa-user-slash"></i>删除账户</button>
+                            <button class="danger-btn" onclick="clearGitHubCache()" style="background: rgba(78, 205, 196, 0.1); color: var(--primary); border-color: rgba(78, 205, 196, 0.3);"><i class="fas fa-broom"></i>清理GitHub缓存</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-info-circle"></i>关于</div>
+                </div>
+                <div style="padding: 20px;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--primary), var(--accent)); border-radius: 20px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-chart-pie" style="font-size: 36px; color: white;"></i>
+                        </div>
+                        <h3 style="color: var(--text-primary); margin-bottom: 8px;">云端记账本</h3>
+                        <p style="color: var(--text-secondary);">版本 2.0.0</p>
+                    </div>
+                    <div style="margin-top: 24px;">
+                        <h4 style="margin-bottom: 12px; color: var(--text-primary);">功能特性</h4>
+                        <ul style="color: var(--text-secondary); padding-left: 20px;">
+                            <li>多设备实时同步</li>
+                            <li>数据云端备份</li>
+                            <li>智能分析报表</li>
+                            <li>预算预警管理</li>
+                            <li>多格式数据导出</li>
+                            <li>金额支持计算公式</li>
+                        </ul>
+                    </div>
+                    <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--card-border);">
+                        <p style="color: var(--text-secondary); text-align: center; font-size: 14px;">© 2023 云端记账本. 基于GitHub API构建.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 移动端底部导航 -->
+    <div class="bottom-nav">
+        <div class="bottom-nav-item active" data-target="dashboard">
+            <i class="fas fa-home"></i>
+            <span>仪表盘</span>
+        </div>
+        <div class="bottom-nav-item" data-target="analytics">
+            <i class="fas fa-chart-line"></i>
+            <span>分析</span>
+        </div>
+        <div class="bottom-nav-item" data-target="add-record">
+            <i class="fas fa-plus-circle"></i>
+            <span>记账</span>
+        </div>
+        <div class="bottom-nav-item" data-target="records">
+            <i class="fas fa-list"></i>
+            <span>所有记录</span>
+        </div>
+        <div class="bottom-nav-more">
+            <div class="bottom-nav-item" id="moreMenuToggle">
+                <i class="fas fa-bars"></i>
+                <span>更多</span>
+            </div>
+            <div class="more-menu" id="moreMenu">
+                <div class="more-menu-item" data-target="budgets"><i class="fas fa-wallet"></i><span>预算管理</span></div>
+                <div class="more-menu-item" data-target="categories"><i class="fas fa-tags"></i><span>分类管理</span></div>
+                <div class="more-menu-item" data-target="export"><i class="fas fa-download"></i><span>导出数据</span></div>
+                <div class="more-menu-item" data-target="settings"><i class="fas fa-cog"></i><span>设置</span></div>
+                <div class="more-menu-item" onclick="logout()"><i class="fas fa-sign-out-alt"></i><span>退出登录</span></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 主题切换按钮 -->
+    <div class="theme-toggle">
+        <button class="theme-btn" onclick="toggleTheme()"><i class="fas fa-moon"></i></button>
+    </div>
+    
+    <!-- 加载动画 -->
+    <div class="loading" id="loading" style="display: none;">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">加载中...</div>
+    </div>
+    
+    <!-- 模态框 -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">标题</h3>
+            </div>
+            <div class="modal-body" id="modalBody">内容</div>
+            <div class="modal-footer" id="modalFooter">
+                <button class="btn-secondary" onclick="closeModal()">取消</button>
+                <button class="btn-primary" onclick="confirmModal()">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./app.js"></script>
+</body>
+</html>
